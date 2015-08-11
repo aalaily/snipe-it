@@ -758,7 +758,6 @@ class UsersController extends AdminController
 		return View::make('backend/users/import', compact('groups', 'selectedGroups', 'permissions', 'selectedPermissions'));
 	}
 
-
 	/**
 	 * User import form processing.
 	 *
@@ -1098,5 +1097,66 @@ class UsersController extends AdminController
     }
 
 
+	
+	/**
+	 * LDAP import
+	 *
+	 * @author Aladin Alaily
+	 * @return View
+	 */
+	public function getLDAP()
+	{
+		// Get all the available groups
+		$groups = Sentry::getGroupProvider()->findAll();
+		// Selected groups
+		$selectedGroups = Input::old('groups', array());
+		// Get all the available permissions
+		$permissions = Config::get('permissions');
+		$this->encodeAllPermissions($permissions);
+		// Selected permissions
+		$selectedPermissions = Input::old('permissions', array('superuser' => -1));
+		$this->encodePermissions($selectedPermissions);
+		// Show the page
+		return View::make('backend/users/ldap', compact('groups', 'selectedGroups', 'permissions', 'selectedPermissions'));
+	}
+	
+
+	/**
+	 * LDAP form processing.
+	 *
+	 * @Auther Aldin Alaily
+	 * @return Redirect
+	 */
+	public function postLDAP()
+	{
+		
+		$connection = Input::get('connection_string');
+		$username   = Input::get('ldap_username');
+		$password   = Input::get('ldap_password');
+		
+		
+		$ldapconn = ldap_connect("ldaps://pydirectory.yorku.ca")
+            or die("Could not connect to LDAP server.");
+		
+		$ldaprdn = 'uid=glnotes,ou=Applications,dc=yorku,dc=ca';
+		$ldappass = 'aolahc8T';  // associated password
+
+		// binding to ldap server
+		$ldapbind = ldap_bind($ldapconn, $ldaprdn, $ldappass)
+			or die("could not bind.");
+		
+		//Search all users
+		$base_dn = "ou=People,dc=yorku,dc=ca";
+		$filter = '(&(cn=*)(!(uid=unset*))(|(pyType=mayastudent)(pyType=currentstudent)(pyType=faculty)(pyType=employee)))';
+
+		$search_results = ldap_search($ldapconn, $base_dn, $filter);
+
+		$results = ldap_get_entries($ldapconn, $search_results);
+		
+		return Redirect::route('users')->with('success', "OK");
+
+	}
+	
+	
 
 }
