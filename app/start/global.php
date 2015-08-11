@@ -57,7 +57,7 @@ App::error(function (Exception $exception, $code) {
                 return Response::make(View::make('error/403'), 403);
 
             case 500:
-                return Response::make(View::make('error/500'), 500);
+                return Response::make(View::make('error/500')->with('error_message', $exception->getMessage()), 500);
 
             default:
                 return Response::make(View::make('error/404'), 404);
