@@ -18,7 +18,6 @@ Create a User ::
         </div>
     </h3>
 </div>
-
 <script type="text/javascript" src="{{ Config::get('app.cdn.default') }}/js/pGenerator.jquery.js"></script>
 
 <form class="form-horizontal" role="form" method="post" action="">
@@ -38,14 +37,17 @@ Create a User ::
 			@endif
 
 			<p>
-				Connect to LDAP and create users.  Passwords will be auto-generated.  
+				Connect to LDAP and create users.  Passwords will be auto-generated.				
+			</p>
+			<p>
+				LDAP configuration settings can be found in the app/config folder in a file called ldap.php
 			</p>
 
             @if (Config::get('app.lock_passwords'))
                 <p>Note: Email notification for users is disabled for this installation.</p>
             @endif
 
-			<!-- LDAP Connection String -->
+			<!--
 			<div class="form-group {{ $errors->has('connection_string') ? 'has-error' : '' }}">
                 <label class="col-md-3 control-label" for="connection_string">LDAP Connection String <i class='fa fa-asterisk'></i></label>
                 <div class="col-md-7">
@@ -54,7 +56,6 @@ Create a User ::
                 </div>
             </div>
 
-			<!-- LDAP Username -->
 			<div class="form-group {{ $errors->has('ldap_username') ? 'has-error' : '' }}">
                 <label class="col-md-3 control-label" for="ldap_username">Username <i class='fa fa-asterisk'></i></label>
                 <div class="col-md-7">
@@ -63,7 +64,6 @@ Create a User ::
                 </div>
             </div>
 
-			<!-- LDAP Password -->
 			<div class="form-group {{ $errors->has('ldap_password') ? 'has-error' : '' }}">
                 <label class="col-md-3 control-label" for="ldap_password">Password <i class='fa fa-asterisk'></i></label>
                 <div class="col-md-7">
@@ -71,7 +71,7 @@ Create a User ::
                     {{ $errors->first('ldap_password', '<br><span class="alert-msg">:message</span>') }}
                 </div>
             </div>
-
+			-->
 			
 			<!--
             <div class="form-group {{ $errors->first('user_import_csv', 'has-error') }}">
@@ -128,13 +128,31 @@ Create a User ::
 	<div class="form-group">
 		<label class="col-md-3 control-label"></label>
 			<div class="col-md-7">
+				<!--
 				<a class="btn btn-link" href="{{ route('users') }}">@lang('button.cancel')</a>
-				<button type="reset" class="btn">Reset</button>
-				<button type="submit" class="btn btn-success"><i class="fa fa-check icon-white"></i> @lang('button.submit')</button>
+				<button type="reset" class="btn">Reset</button> -->
+				<button type="submit" class="btn btn-success"><i class="fa fa-check icon-white"></i> Synchronize</button>
 			</div>
 		</div>
 
 </form>
+
+@if (Session::get('summary'))
+			<p>
+				<table>
+				<?php
+				$summary = Session::get('summary');
+				foreach( $summary as $entry ) {
+					echo "<tr>";
+					foreach( $entry as $entry_item ) {
+						echo "<td>" . $entry_item . "</td>";
+					}
+					echo "</tr>";
+				}
+				?>
+				</table>
+			</p>
+			@endif
 
 <script>
 $(document).ready(function(){
