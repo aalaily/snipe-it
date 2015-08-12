@@ -28,6 +28,7 @@ use League\Csv\Reader;
 use Mail;
 use Accessory;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Log;
 
 class UsersController extends AdminController
 {
@@ -1122,6 +1123,19 @@ class UsersController extends AdminController
 	
 
 	/**
+     * Declare the rules for the form validation
+     *
+     * @var array
+     */
+    protected $ldapValidationRules = array(
+        'firstname'       => 'required|alpha_space|min:2',
+        'lastname'        => 'required|alpha_space|min:2',
+		'pycyin'          => 'numeric',
+        'username'        => 'required|min:2|unique:users,username',
+        'mail'           => 'email|unique:users,email',
+    );
+	
+	/**
 	 * LDAP form processing.
 	 *
 	 * @Auther Aldin Alaily
@@ -1130,30 +1144,89 @@ class UsersController extends AdminController
 	public function postLDAP()
 	{
 		
-		$connection = Input::get('connection_string');
-		$username   = Input::get('ldap_username');
-		$password   = Input::get('ldap_password');
 		
+		$url        = Config::get('ldap.url');
+		$username   = Config::get('ldap.username');
+		$password   = Config::get('ldap.password');
+		$base_dn    = Config::get('ldap.basedn');
+		$filter     = Config::get('ldap.filter');
 		
-		$ldapconn = ldap_connect("ldaps://pydirectory.yorku.ca")
-            or die("Could not connect to LDAP server.");
+		Log::info("post LDAP");
+		Log::debug("Debug in LDAP");
+		$ldapconn = ldap_connect($url)
+			or die("Could not connect to LDAP server.");
 		
-		$ldaprdn = 'uid=glnotes,ou=Applications,dc=yorku,dc=ca';
-		$ldappass = 'aolahc8T';  // associated password
-
-		// binding to ldap server
-		$ldapbind = ldap_bind($ldapconn, $ldaprdn, $ldappass)
+		// Binding to ldap server
+		$ldapbind = ldap_bind($ldapconn, $username, $password)
 			or die("could not bind.");
-		
-		//Search all users
-		$base_dn = "ou=People,dc=yorku,dc=ca";
-		$filter = '(&(cn=*)(!(uid=unset*))(|(pyType=mayastudent)(pyType=currentstudent)(pyType=faculty)(pyType=employee)))';
 
+		// Perform the search
 		$search_results = ldap_search($ldapconn, $base_dn, $filter);
-
 		$results = ldap_get_entries($ldapconn, $search_results);
+
+		$summary = array();
+		for( $i=0; $i < $results["count"]; $i++ )  {
+			if( $results[$i]["pyactive"][0] == "TRUE" ) {
+								
+				$item = array();
+				
+				$item["username"]  = $results[$i]["pyusername"][0];
+				$item["pycyin"]    = $results[$i]["pycyin"][0];
+				$item["cn"]        = $results[$i]["cn"][0];
+				$item["lastname"]  = $results[$i]["sn"][0];
+				$item["firstname"] = $results[$i]["givenname"][0];
+				$item["mail"]      = $results[$i]["mail"][0];
+				
+				$user = DB::table('users')->where('username', $item['username'])->first();
+				if ($user) {
+					$item["note"] = "<strong>exists</strong>";
+				} else {
+					
+					$validator = Validator::make($item, $this->ldapValidationRules);
+					if ($validator->fails()) {
+						$item["note"] = "Validotor failed: " . $validator->messages();
+					}
+					else {
+						
+						// Create the user if they don't exist.
+						$pass = substr(str_shuffle("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"), 0, 10);
+						
+						$newuser = array(
+							'first_name'   => $item["firstname"],
+							'last_name'    => $item["lastname"],
+							'username'     => $item["username"],
+							'email'        => $item["mail"],
+							'employee_num' => $item["pycyin"],
+							'password'     => $pass,
+							'activated'    => 1,
+							'location_id'  => 1,
+							'permissions'  => '{"user":1}',
+							'notes'        => 'Imported from LDAP'
+						);
+						
+						DB::table('users')->insert($newuser);
+						
+						$updateuser = Sentry::findUserByLogin($item["username"]);
+
+						// Update the user details
+						$updateuser->password = $pass;
+
+						// Update the user
+						$updateuser->save();
+						
+						$item["note"] = "<strong>created" . " " . $pass . "</strong>";
+					} // Validator didn't fail
+				}
+				
+				
+				array_push($summary, $item);
+			}
+			if( $i <= 1 ) break;
+		}
 		
-		return Redirect::route('users')->with('success', "OK");
+		
+		
+		return Redirect::route('ldap/user')->with('success', "OK")->with('summary', $summary);
 
 	}
 	
